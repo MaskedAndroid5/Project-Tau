@@ -1,0 +1,69 @@
+name: Project TAU verification
+
+on:
+  push:
+    branches:
+      - assistant/project-tau-transfer
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out working branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: project-tau-registry-source.zip
+
+      - name: Inspect and extract submitted source archive
+        shell: bash
+        run: |
+          test -s project-tau-registry-source.zip
+          mkdir source
+          python -m zipfile -e project-tau-registry-source.zip source
+          echo "Archive contents:"
+          find source -maxdepth 3 -type f -print | sort
+
+      - name: Install project dependencies
+        working-directory: source
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run automated tests
+        working-directory: source
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@127.0.0.1:5432/test
+          ADMIN_USERNAME: ci-admin
+          ADMIN_PASSWORD: ci-test-password-not-for-production
+          ENVIRONMENT: development
+          TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+          TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+        run: python -m pytest -q
+
+      - name: Build clean source archive
+        shell: bash
+        run: |
+          cd source
+          zip -r ../project-tau-registry-verified.zip . \
+            -x ".env" "*/.env" ".venv/*" "*/.venv/*" \
+               "venv/*" "*/venv/*" ".git/*" "*/.git/*" \
+               "__pycache__/*" "*/__pycache__/*" \
+               ".pytest_cache/*" "*/.pytest_cache/*" \
+               "*.pyc" "*.pyo" "*.db" "*.sqlite" "*.sqlite3" "*.log"
+
+      - name: Upload verified source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-tau-registry-verified
+          path: project-tau-registry-verified.zip
+          if-no-files-found: error
+          retention-days: 14
