@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+asyncpg
+pydantic-settings
+python-dotenv
+jinja2
+python-multipart
+pytest
+httpx
+greenlet
+pytest-asyncio
+redis>=5.0
